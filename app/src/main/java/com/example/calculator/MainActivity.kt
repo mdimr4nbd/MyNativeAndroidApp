@@ -2,152 +2,156 @@
 package com.example.calculator
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
-import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import java.math.BigDecimal
 
 class MainActivity : Activity() {
 
+    private lateinit var root: LinearLayout
     private lateinit var expressionView: TextView
     private lateinit var resultView: TextView
 
     private var expression = ""
+    private var dark = true
     private var justCalculated = false
 
-    private val black = Color.BLACK
-    private val numberColor = Color.rgb(43, 43, 43)
-    private val lightGray = Color.rgb(95, 95, 95)
-    private val orange = Color.rgb(255, 145, 20)
-    private val white = Color.WHITE
+    private val history = mutableListOf<String>()
+
+    private val keys = listOf(
+        listOf("AC", "C", "%", "÷"),
+        listOf("7", "8", "9", "×"),
+        listOf("4", "5", "6", "−"),
+        listOf("1", "2", "3", "+"),
+        listOf("00", "0", ".", "=")
+    )
+
+    private fun dp(v: Int) =
+        (v * resources.displayMetrics.density).toInt()
+
+    private fun color(hex: Long) = Color.rgb(
+        ((hex shr 16) and 255).toInt(),
+        ((hex shr 8) and 255).toInt(),
+        (hex and 255).toInt()
+    )
+
+    private val bg: Int
+        get() = if (dark) Color.BLACK else color(0xEAF6FF)
+
+    private val buttonBg: Int
+        get() = if (dark) color(0x101010) else color(0xD9EDF9)
+
+    private val functionBg: Int
+        get() = if (dark) color(0x080808) else color(0xF5FBFF)
+
+    private val primary: Int
+        get() = if (dark) Color.WHITE else color(0x253D50)
+
+    private val secondary: Int
+        get() = if (dark) color(0xB0B0B0) else color(0x52748A)
+
+    private val blue: Int
+        get() = color(0x168ACB)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = black
-        window.navigationBarColor = black
+        window.statusBarColor = Color.BLACK
+        window.navigationBarColor = Color.BLACK
 
-        createCalculator()
+        createUI()
     }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private fun rounded(color: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(5).toFloat()
+        }
+    }
 
-    private fun createCalculator() {
+    private fun createUI() {
 
-        val root = LinearLayout(this).apply {
+        root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(black)
-            setPadding(dp(15), dp(12), dp(15), dp(12))
+            setPadding(dp(15), dp(10), dp(15), dp(12))
+            setBackgroundColor(bg)
         }
 
-        // Top three icons
+        // Header
 
-        val toolbar = LinearLayout(this).apply {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val historyButton = headerIcon("◷") {
+            showHistory()
+        }
+
+        val title = TextView(this).apply {
+            text = "Calculator"
+            textSize = 21f
             gravity = Gravity.CENTER
-            background = rounded(
-                Color.rgb(35, 35, 35),
-                60
-            )
-            setPadding(dp(12), dp(5), dp(12), dp(5))
+            setTextColor(primary)
+            typeface = Typeface.DEFAULT_BOLD
         }
 
-        val icons = listOf("◷", "＄", "▱")
-
-        icons.forEachIndexed { index, icon ->
-
-            val item = TextView(this).apply {
-                text = icon
-                textSize = 27f
-                gravity = Gravity.CENTER
-                setTextColor(Color.LTGRAY)
-                contentDescription = when (index) {
-                    0 -> "History"
-                    1 -> "Currency converter"
-                    else -> "Unit converter"
-                }
-
-                setOnClickListener {
-                    when (index) {
-                        0 -> Toast.makeText(
-                            this@MainActivity,
-                            "History is empty",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
-                        1 -> Toast.makeText(
-                            this@MainActivity,
-                            "Currency converter coming soon",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
-                        2 -> Toast.makeText(
-                            this@MainActivity,
-                            "Unit converter coming soon",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
-
-            toolbar.addView(
-                item,
-                LinearLayout.LayoutParams(
-                    dp(70),
-                    dp(55)
-                )
-            )
+        val themeButton = headerIcon(
+            if (dark) "☼" else "☾"
+        ) {
+            dark = !dark
+            createUI()
         }
 
-        val toolbarContainer = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            addView(
-                toolbar,
-                LinearLayout.LayoutParams(
-                    dp(220),
-                    dp(65)
-                )
-            )
-        }
-
-        root.addView(
-            toolbarContainer,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(75)
-            )
+        header.addView(
+            historyButton,
+            LinearLayout.LayoutParams(dp(48), dp(48))
         )
 
-        // Display area
+        header.addView(
+            title,
+            LinearLayout.LayoutParams(0, dp(48), 1f)
+        )
+
+        header.addView(
+            themeButton,
+            LinearLayout.LayoutParams(dp(48), dp(48))
+        )
+
+        root.addView(
+            header,
+            LinearLayout.LayoutParams(-1, dp(52))
+        )
+
+        // Display
 
         val display = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM or Gravity.END
-            setPadding(dp(8), dp(10), dp(8), dp(25))
+            setPadding(dp(8), dp(20), dp(8), dp(25))
         }
 
         expressionView = TextView(this).apply {
-            text = ""
-            textSize = 29f
+            textSize = 23f
             gravity = Gravity.END
-            setTextColor(Color.LTGRAY)
+            setTextColor(secondary)
             maxLines = 2
         }
 
         resultView = TextView(this).apply {
-            text = ""
-            textSize = 52f
+            textSize = 48f
             gravity = Gravity.END
-            setTextColor(white)
-            typeface = Typeface.DEFAULT
+            setTextColor(primary)
+            typeface = Typeface.create(
+                "sans-serif-light",
+                Typeface.NORMAL
+            )
             maxLines = 1
         }
 
@@ -163,49 +167,32 @@ class MainActivity : Activity() {
 
         root.addView(
             display,
-            LinearLayout.LayoutParams(
-                -1,
-                0,
-                1.8f
-            )
+            LinearLayout.LayoutParams(-1, 0, 1.8f)
         )
 
-        // Calculator keypad
-
-        val rows = listOf(
-            listOf("AC", "%", "DEL", "÷"),
-            listOf("7", "8", "9", "×"),
-            listOf("4", "5", "6", "-"),
-            listOf("1", "2", "3", "+"),
-            listOf("√π", "0", ".", "=")
-        )
+        // Keypad
 
         val keypad = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        rows.forEach { keys ->
+        keys.forEach { rowKeys ->
 
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
             }
 
-            keys.forEach { key ->
+            rowKeys.forEach { key ->
 
-                val button = createButton(key)
+                val button = makeButton(key)
 
                 row.addView(
                     button,
                     LinearLayout.LayoutParams(
-                        0,
-                        -1,
-                        1f
+                        0, -1, 1f
                     ).apply {
                         setMargins(
-                            dp(4),
-                            dp(4),
-                            dp(4),
-                            dp(4)
+                            dp(4), dp(5), dp(4), dp(5)
                         )
                     }
                 )
@@ -213,83 +200,68 @@ class MainActivity : Activity() {
 
             keypad.addView(
                 row,
-                LinearLayout.LayoutParams(
-                    -1,
-                    0,
-                    1f
-                )
+                LinearLayout.LayoutParams(-1, 0, 1f)
             )
         }
 
         root.addView(
             keypad,
-            LinearLayout.LayoutParams(
-                -1,
-                0,
-                2.7f
-            )
+            LinearLayout.LayoutParams(-1, 0, 2.7f)
         )
 
         setContentView(root)
+
+        updateDisplay()
     }
 
-    private fun rounded(
-        color: Int,
-        radius: Int
-    ): GradientDrawable {
+    private fun headerIcon(
+        symbol: String,
+        action: () -> Unit
+    ): TextView {
 
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
+        return TextView(this).apply {
+            text = symbol
+            textSize = 27f
+            gravity = Gravity.CENTER
+            setTextColor(secondary)
+            setOnClickListener { action() }
         }
     }
 
-    private fun createButton(key: String): TextView {
+    private fun makeButton(key: String): TextView {
 
         val isOperator = key in listOf(
-            "÷", "×", "-", "+", "="
+            "÷", "×", "−", "+", "%"
         )
 
-        val isSpecial = key in listOf(
-            "AC", "%", "DEL", "√π"
-        )
+        val isFunction = key in listOf("AC", "C")
 
-        val bg = when {
-            key == "=" -> orange
-            isOperator -> lightGray
-            isSpecial -> lightGray
-            else -> numberColor
+        val buttonColor = when {
+            isOperator -> functionBg
+            isFunction -> functionBg
+            else -> buttonBg
         }
 
-        val text = when (key) {
-            "DEL" -> "⌫"
-            "√π" -> "√π"
-            else -> key
+        val textColor = when {
+            isOperator -> blue
+            isFunction -> blue
+            else -> primary
         }
 
         return TextView(this).apply {
 
-            this.text = text
-
-            textSize = when (key) {
-                "AC", "DEL" -> 25f
-                "√π" -> 27f
-                else -> 31f
-            }
-
+            text = key
             gravity = Gravity.CENTER
 
-            setTextColor(white)
-
-            background = rounded(bg, 100)
-
-            typeface = Typeface.DEFAULT
-
-            contentDescription = when (key) {
-                "DEL" -> "Delete"
-                "√π" -> "Square root and pi"
-                else -> key
+            textSize = when (key) {
+                "AC", "C" -> 23f
+                else -> 29f
             }
+
+            setTextColor(textColor)
+            typeface = Typeface.DEFAULT_BOLD
+
+            background = rounded(buttonColor)
 
             isClickable = true
             isFocusable = true
@@ -307,40 +279,15 @@ class MainActivity : Activity() {
             "AC" -> {
                 expression = ""
                 justCalculated = false
-                updateDisplay()
             }
 
-            "DEL" -> {
-                if (expression.isNotEmpty()) {
-                    expression = expression.dropLast(1)
-                }
-                justCalculated = false
-                updateDisplay()
+            "C" -> {
+                clearEntry()
             }
 
-            "=" -> calculateResult()
-
-            "√π" -> {
-                try {
-                    if (expression.isEmpty()) {
-                        expression = "3.141592653589793"
-                    } else {
-                        val value =
-                            ExpressionParser(expression).parse()
-
-                        if (value < 0) {
-                            throw ArithmeticException()
-                        }
-
-                        expression = formatNumber(kotlin.math.sqrt(value))
-                    }
-
-                    justCalculated = true
-                    updateDisplay()
-
-                } catch (_: Exception) {
-                    resultView.text = "Error"
-                }
+            "=" -> {
+                calculate()
+                return
             }
 
             "%" -> {
@@ -350,28 +297,32 @@ class MainActivity : Activity() {
                 ) {
                     expression += "%"
                 }
-
                 justCalculated = false
-                updateDisplay()
             }
 
-            "+", "-", "×", "÷" -> {
+            "÷", "×", "−", "+" -> {
+
+                val op = when (key) {
+                    "÷" -> "÷"
+                    "×" -> "×"
+                    "−" -> "-"
+                    else -> "+"
+                }
 
                 if (expression.isEmpty()) {
-                    if (key == "-") expression = "-"
+                    if (op == "-") expression = "-"
                 } else {
                     if (expression.last() in "+-×÷") {
                         expression = expression.dropLast(1)
                     }
-
-                    expression += key
+                    expression += op
                 }
 
                 justCalculated = false
-                updateDisplay()
             }
 
             "." -> {
+
                 if (justCalculated) {
                     expression = ""
                     justCalculated = false
@@ -389,25 +340,42 @@ class MainActivity : Activity() {
                         expression.last() in "+-×÷"
                     ) "0." else "."
                 }
-
-                updateDisplay()
             }
 
             else -> {
+
                 if (justCalculated) {
                     expression = ""
                     justCalculated = false
                 }
 
                 expression += key
-                updateDisplay()
             }
         }
+
+        updateDisplay()
+    }
+
+    private fun clearEntry() {
+
+        if (expression.isEmpty()) return
+
+        var i = expression.length - 1
+
+        while (i >= 0 &&
+            (expression[i].isDigit() ||
+             expression[i] == '.')
+        ) {
+            i--
+        }
+
+        expression = expression.substring(0, i + 1)
+        justCalculated = false
     }
 
     private fun updateDisplay() {
 
-        expressionView.text = expression
+        expressionView.text = expression.replace("-", "−")
 
         if (expression.isEmpty()) {
             resultView.text = ""
@@ -415,21 +383,23 @@ class MainActivity : Activity() {
         }
 
         try {
-            val result = ExpressionParser(expression).parse()
-            resultView.text = formatNumber(result)
-
+            val value = ExpressionParser(expression).parse()
+            resultView.text = formatNumber(value)
         } catch (_: Exception) {
             resultView.text = ""
         }
     }
 
-    private fun calculateResult() {
+    private fun calculate() {
 
         if (expression.isEmpty()) return
 
         try {
+            val original = expression.replace("-", "−")
             val value = ExpressionParser(expression).parse()
             val answer = formatNumber(value)
+
+            history.add("$original = $answer")
 
             expression = answer
             expressionView.text = ""
@@ -443,8 +413,33 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun formatNumber(value: Double): String {
+    private fun showHistory() {
 
+        if (history.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("History")
+                .setMessage("No calculations yet.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Calculation History")
+            .setItems(history.reversed().toTypedArray()) { _, index ->
+                expression = history.reversed()[index]
+                    .substringAfter(" = ")
+                justCalculated = true
+                updateDisplay()
+            }
+            .setNeutralButton("Clear History") { _, _ ->
+                history.clear()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun formatNumber(value: Double): String {
         if (!value.isFinite()) return "Error"
 
         return BigDecimal.valueOf(value)
@@ -453,8 +448,6 @@ class MainActivity : Activity() {
     }
 }
 
-// Expression parser
-
 private class ExpressionParser(
     private val input: String
 ) {
@@ -462,38 +455,28 @@ private class ExpressionParser(
     private var position = 0
 
     fun parse(): Double {
-
         val result = parseExpression()
 
-        if (position != input.length) {
-            throw IllegalArgumentException()
-        }
-
-        if (!result.isFinite()) {
-            throw ArithmeticException()
+        if (position != input.length || !result.isFinite()) {
+            throw IllegalArgumentException("Invalid expression")
         }
 
         return result
     }
 
     private fun parseExpression(): Double {
-
         var value = parseTerm()
 
         while (position < input.length) {
-
             when (input[position]) {
-
                 '+' -> {
                     position++
                     value += parseTerm()
                 }
-
                 '-' -> {
                     position++
                     value -= parseTerm()
                 }
-
                 else -> return value
             }
         }
@@ -502,30 +485,22 @@ private class ExpressionParser(
     }
 
     private fun parseTerm(): Double {
-
         var value = parseFactor()
 
         while (position < input.length) {
-
             when (input[position]) {
-
                 '×' -> {
                     position++
                     value *= parseFactor()
                 }
-
                 '÷' -> {
                     position++
-
                     val divisor = parseFactor()
-
                     if (divisor == 0.0) {
-                        throw ArithmeticException()
+                        throw ArithmeticException("Division by zero")
                     }
-
                     value /= divisor
                 }
-
                 else -> return value
             }
         }
@@ -549,46 +524,27 @@ private class ExpressionParser(
             return parseFactor()
         }
 
-        var value: Double
+        val start = position
+        var decimal = false
 
-        if (input[position] == '(') {
+        while (position < input.length) {
+            val c = input[position]
 
-            position++
-            value = parseExpression()
-
-            if (position >= input.length ||
-                input[position] != ')'
-            ) {
-                throw IllegalArgumentException()
+            if (c.isDigit()) {
+                position++
+            } else if (c == '.' && !decimal) {
+                decimal = true
+                position++
+            } else {
+                break
             }
-
-            position++
-
-        } else {
-
-            val start = position
-            var hasDecimal = false
-
-            while (position < input.length) {
-
-                val char = input[position]
-
-                if (char.isDigit()) {
-                    position++
-                } else if (char == '.' && !hasDecimal) {
-                    hasDecimal = true
-                    position++
-                } else {
-                    break
-                }
-            }
-
-            if (start == position) {
-                throw IllegalArgumentException()
-            }
-
-            value = input.substring(start, position).toDouble()
         }
+
+        if (start == position) {
+            throw IllegalArgumentException()
+        }
+
+        var value = input.substring(start, position).toDouble()
 
         while (position < input.length &&
             input[position] == '%'
