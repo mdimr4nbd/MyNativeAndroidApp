@@ -1,4 +1,3 @@
-
 pluginManagement {
     repositories {
         google()
@@ -17,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MyNativeAndroidApp"
+rootProject.name = "CalculatorApp"
 include(":app")
