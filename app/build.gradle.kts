@@ -1,17 +1,17 @@
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
 android {
-    namespace = "com.example.myapp"
-    compileSdk = 35
+    namespace = "com.example.calculator"
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myapp"
+        applicationId = "com.example.calculator"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 36
+
         versionCode = 1
         versionName = "1.0"
     }
