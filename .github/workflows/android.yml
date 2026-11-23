@@ -1,19 +1,19 @@
-
-name: Build Calculator APK
+name: Build and Auto Release Calculator
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout repository
@@ -31,11 +31,11 @@ jobs:
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)
 
           if [ -z "$SDKMANAGER" ]; then
-            echo "sdkmanager not found!"
+            echo "sdkmanager not found"
             exit 1
           fi
 
-          printf 'y\n%.0s' {1..20} | "$SDKMANAGER" --licenses
+          yes | "$SDKMANAGER" --licenses || true
 
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
@@ -47,8 +47,26 @@ jobs:
       - name: Build Calculator APK
         run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Calculator-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: My Calculator ${{ github.ref_name }}
+          body: |
+            ## My Calculator
+
+            - Native Android Kotlin Calculator
+            - AMOLED Black Theme
+            - Basic Arithmetic Operations
+            - Percentage and Decimal Support
+
+            Download the APK below.
+          files: app/build/outputs/apk/debug/app-debug.apk
+          fail_on_unmatched_files: true
