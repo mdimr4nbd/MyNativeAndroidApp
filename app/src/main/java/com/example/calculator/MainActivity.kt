@@ -1,3 +1,4 @@
+
 package com.example.calculator
 
 import android.app.Activity
@@ -9,8 +10,8 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import java.math.BigDecimal
-import java.util.Locale
 
 class MainActivity : Activity() {
 
@@ -20,65 +21,133 @@ class MainActivity : Activity() {
     private var expression = ""
     private var justCalculated = false
 
-    private val bgColor = Color.rgb(10, 12, 12)
-    private val buttonColor = Color.rgb(29, 34, 33)
-    private val green = Color.rgb(0, 220, 140)
-    private val textColor = Color.WHITE
-    private val mutedColor = Color.rgb(145, 155, 150)
+    private val black = Color.BLACK
+    private val numberColor = Color.rgb(43, 43, 43)
+    private val lightGray = Color.rgb(95, 95, 95)
+    private val orange = Color.rgb(255, 145, 20)
+    private val white = Color.WHITE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = bgColor
-        window.navigationBarColor = bgColor
-        window.decorView.systemUiVisibility = 0
+        window.statusBarColor = black
+        window.navigationBarColor = black
 
         createCalculator()
     }
 
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
     private fun createCalculator() {
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(bgColor)
-            setPadding(dp(18), dp(20), dp(18), dp(18))
+            gravity = Gravity.CENTER_HORIZONTAL
+            setBackgroundColor(black)
+            setPadding(dp(15), dp(12), dp(15), dp(12))
         }
 
-        val heading = TextView(this).apply {
-            text = "CALCULATOR"
-            textSize = 15f
-            letterSpacing = 0.16f
-            setTextColor(mutedColor)
-            typeface = Typeface.DEFAULT_BOLD
+        // Top three icons
+
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = rounded(
+                Color.rgb(35, 35, 35),
+                60
+            )
+            setPadding(dp(12), dp(5), dp(12), dp(5))
+        }
+
+        val icons = listOf("◷", "＄", "▱")
+
+        icons.forEachIndexed { index, icon ->
+
+            val item = TextView(this).apply {
+                text = icon
+                textSize = 27f
+                gravity = Gravity.CENTER
+                setTextColor(Color.LTGRAY)
+                contentDescription = when (index) {
+                    0 -> "History"
+                    1 -> "Currency converter"
+                    else -> "Unit converter"
+                }
+
+                setOnClickListener {
+                    when (index) {
+                        0 -> Toast.makeText(
+                            this@MainActivity,
+                            "History is empty",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        1 -> Toast.makeText(
+                            this@MainActivity,
+                            "Currency converter coming soon",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        2 -> Toast.makeText(
+                            this@MainActivity,
+                            "Unit converter coming soon",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+
+            toolbar.addView(
+                item,
+                LinearLayout.LayoutParams(
+                    dp(70),
+                    dp(55)
+                )
+            )
+        }
+
+        val toolbarContainer = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            addView(
+                toolbar,
+                LinearLayout.LayoutParams(
+                    dp(220),
+                    dp(65)
+                )
+            )
         }
 
         root.addView(
-            heading,
+            toolbarContainer,
             LinearLayout.LayoutParams(
                 -1,
-                dp(45)
+                dp(75)
             )
         )
+
+        // Display area
 
         val display = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM or Gravity.END
-            setPadding(dp(5), dp(20), dp(5), dp(25))
+            setPadding(dp(8), dp(10), dp(8), dp(25))
         }
 
         expressionView = TextView(this).apply {
             text = ""
-            textSize = 30f
-            setTextColor(mutedColor)
+            textSize = 29f
             gravity = Gravity.END
+            setTextColor(Color.LTGRAY)
             maxLines = 2
         }
 
         resultView = TextView(this).apply {
-            text = "0"
-            textSize = 48f
-            setTextColor(textColor)
+            text = ""
+            textSize = 52f
             gravity = Gravity.END
-            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(white)
+            typeface = Typeface.DEFAULT
             maxLines = 1
         }
 
@@ -94,104 +163,133 @@ class MainActivity : Activity() {
 
         root.addView(
             display,
-            LinearLayout.LayoutParams( -1, 0, 1f)
+            LinearLayout.LayoutParams(
+                -1,
+                0,
+                1.8f
+            )
         )
 
-        val keys = listOf(
-            listOf("AC", "DEL", "%", "÷"),
+        // Calculator keypad
+
+        val rows = listOf(
+            listOf("AC", "%", "DEL", "÷"),
             listOf("7", "8", "9", "×"),
             listOf("4", "5", "6", "-"),
             listOf("1", "2", "3", "+"),
-            listOf("0", ".", "=", "")
+            listOf("√π", "0", ".", "=")
         )
 
         val keypad = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        keys.forEach { rowKeys ->
+        rows.forEach { keys ->
 
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
             }
 
-            rowKeys.forEach { key ->
+            keys.forEach { key ->
 
-                if (key.isEmpty()) {
-                    row.addView(
-                        View(this),
-                        LinearLayout.LayoutParams(
-                            0,
-                            dp(76),
-                            1f
+                val button = createButton(key)
+
+                row.addView(
+                    button,
+                    LinearLayout.LayoutParams(
+                        0,
+                        -1,
+                        1f
+                    ).apply {
+                        setMargins(
+                            dp(4),
+                            dp(4),
+                            dp(4),
+                            dp(4)
                         )
-                    )
-                } else {
-                    val button = createButton(key)
-
-                    row.addView(
-                        button,
-                        LinearLayout.LayoutParams(
-                            0,
-                            dp(76),
-                            1f
-                        ).apply {
-                            setMargins(
-                                dp(5),
-                                dp(5),
-                                dp(5),
-                                dp(5)
-                            )
-                        }
-                    )
-                }
+                    }
+                )
             }
 
             keypad.addView(
                 row,
-                LinearLayout.LayoutParams(-1, 0, 1f)
+                LinearLayout.LayoutParams(
+                    -1,
+                    0,
+                    1f
+                )
             )
         }
 
         root.addView(
             keypad,
-            LinearLayout.LayoutParams(-1, 0, 2.5f)
+            LinearLayout.LayoutParams(
+                -1,
+                0,
+                2.7f
+            )
         )
 
         setContentView(root)
     }
 
+    private fun rounded(
+        color: Int,
+        radius: Int
+    ): GradientDrawable {
+
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+        }
+    }
+
     private fun createButton(key: String): TextView {
 
         val isOperator = key in listOf(
-            "÷", "×", "-", "+", "%", "="
+            "÷", "×", "-", "+", "="
         )
 
-        val isAction = key in listOf("AC", "DEL")
+        val isSpecial = key in listOf(
+            "AC", "%", "DEL", "√π"
+        )
 
-        val button = TextView(this).apply {
-            text = key
-            textSize = if (key.length > 2) 18f else 25f
+        val bg = when {
+            key == "=" -> orange
+            isOperator -> lightGray
+            isSpecial -> lightGray
+            else -> numberColor
+        }
+
+        val text = when (key) {
+            "DEL" -> "⌫"
+            "√π" -> "√π"
+            else -> key
+        }
+
+        return TextView(this).apply {
+
+            this.text = text
+
+            textSize = when (key) {
+                "AC", "DEL" -> 25f
+                "√π" -> 27f
+                else -> 31f
+            }
+
             gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
 
-            setTextColor(
-                when {
-                    key == "=" -> Color.BLACK
-                    isOperator -> green
-                    isAction -> green
-                    else -> textColor
-                }
-            )
+            setTextColor(white)
 
-            background = roundedBackground(
-                when {
-                    key == "=" -> green
-                    isOperator -> Color.rgb(25, 48, 40)
-                    isAction -> Color.rgb(35, 43, 40)
-                    else -> buttonColor
-                }
-            )
+            background = rounded(bg, 100)
+
+            typeface = Typeface.DEFAULT
+
+            contentDescription = when (key) {
+                "DEL" -> "Delete"
+                "√π" -> "Square root and pi"
+                else -> key
+            }
 
             isClickable = true
             isFocusable = true
@@ -199,15 +297,6 @@ class MainActivity : Activity() {
             setOnClickListener {
                 handleKey(key)
             }
-        }
-
-        return button
-    }
-
-    private fun roundedBackground(color: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(24).toFloat()
         }
     }
 
@@ -231,6 +320,29 @@ class MainActivity : Activity() {
 
             "=" -> calculateResult()
 
+            "√π" -> {
+                try {
+                    if (expression.isEmpty()) {
+                        expression = "3.141592653589793"
+                    } else {
+                        val value =
+                            ExpressionParser(expression).parse()
+
+                        if (value < 0) {
+                            throw ArithmeticException()
+                        }
+
+                        expression = formatNumber(kotlin.math.sqrt(value))
+                    }
+
+                    justCalculated = true
+                    updateDisplay()
+
+                } catch (_: Exception) {
+                    resultView.text = "Error"
+                }
+            }
+
             "%" -> {
                 if (expression.isNotEmpty() &&
                     (expression.last().isDigit() ||
@@ -238,21 +350,21 @@ class MainActivity : Activity() {
                 ) {
                     expression += "%"
                 }
+
                 justCalculated = false
                 updateDisplay()
             }
 
             "+", "-", "×", "÷" -> {
-                val operator = key
 
                 if (expression.isEmpty()) {
-                    if (operator == "-") expression = "-"
+                    if (key == "-") expression = "-"
                 } else {
                     if (expression.last() in "+-×÷") {
                         expression = expression.dropLast(1)
                     }
 
-                    expression += operator
+                    expression += key
                 }
 
                 justCalculated = false
@@ -265,13 +377,13 @@ class MainActivity : Activity() {
                     justCalculated = false
                 }
 
-                val currentNumber = expression
+                val current = expression
                     .substringAfterLast("+")
                     .substringAfterLast("-")
                     .substringAfterLast("×")
                     .substringAfterLast("÷")
 
-                if (!currentNumber.contains(".")) {
+                if (!current.contains(".")) {
                     expression += if (
                         expression.isEmpty() ||
                         expression.last() in "+-×÷"
@@ -294,22 +406,25 @@ class MainActivity : Activity() {
     }
 
     private fun updateDisplay() {
+
         expressionView.text = expression
 
         if (expression.isEmpty()) {
-            resultView.text = "0"
+            resultView.text = ""
             return
         }
 
         try {
-            val value = ExpressionParser(expression).parse()
-            resultView.text = formatNumber(value)
+            val result = ExpressionParser(expression).parse()
+            resultView.text = formatNumber(result)
+
         } catch (_: Exception) {
             resultView.text = ""
         }
     }
 
     private fun calculateResult() {
+
         if (expression.isEmpty()) return
 
         try {
@@ -319,6 +434,7 @@ class MainActivity : Activity() {
             expression = answer
             expressionView.text = ""
             resultView.text = answer
+
             justCalculated = true
 
         } catch (_: Exception) {
@@ -328,19 +444,16 @@ class MainActivity : Activity() {
     }
 
     private fun formatNumber(value: Double): String {
+
         if (!value.isFinite()) return "Error"
 
         return BigDecimal.valueOf(value)
             .stripTrailingZeros()
             .toPlainString()
     }
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
 }
 
-/* Mathematical expression parser */
+// Expression parser
 
 private class ExpressionParser(
     private val input: String
@@ -349,24 +462,28 @@ private class ExpressionParser(
     private var position = 0
 
     fun parse(): Double {
+
         val result = parseExpression()
 
         if (position != input.length) {
-            throw IllegalArgumentException("Invalid expression")
+            throw IllegalArgumentException()
         }
 
         if (!result.isFinite()) {
-            throw ArithmeticException("Invalid result")
+            throw ArithmeticException()
         }
 
         return result
     }
 
     private fun parseExpression(): Double {
+
         var value = parseTerm()
 
         while (position < input.length) {
+
             when (input[position]) {
+
                 '+' -> {
                     position++
                     value += parseTerm()
@@ -385,10 +502,13 @@ private class ExpressionParser(
     }
 
     private fun parseTerm(): Double {
+
         var value = parseFactor()
 
         while (position < input.length) {
+
             when (input[position]) {
+
                 '×' -> {
                     position++
                     value *= parseFactor()
@@ -396,10 +516,11 @@ private class ExpressionParser(
 
                 '÷' -> {
                     position++
+
                     val divisor = parseFactor()
 
                     if (divisor == 0.0) {
-                        throw ArithmeticException("Division by zero")
+                        throw ArithmeticException()
                     }
 
                     value /= divisor
@@ -415,7 +536,7 @@ private class ExpressionParser(
     private fun parseFactor(): Double {
 
         if (position >= input.length) {
-            throw IllegalArgumentException("Missing number")
+            throw IllegalArgumentException()
         }
 
         if (input[position] == '-') {
@@ -431,22 +552,25 @@ private class ExpressionParser(
         var value: Double
 
         if (input[position] == '(') {
+
             position++
             value = parseExpression()
 
             if (position >= input.length ||
                 input[position] != ')'
             ) {
-                throw IllegalArgumentException("Missing bracket")
+                throw IllegalArgumentException()
             }
 
             position++
 
         } else {
+
             val start = position
             var hasDecimal = false
 
             while (position < input.length) {
+
                 val char = input[position]
 
                 if (char.isDigit()) {
@@ -460,7 +584,7 @@ private class ExpressionParser(
             }
 
             if (start == position) {
-                throw IllegalArgumentException("Invalid number")
+                throw IllegalArgumentException()
             }
 
             value = input.substring(start, position).toDouble()
