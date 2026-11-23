@@ -8,6 +8,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.math.BigDecimal
@@ -18,8 +20,8 @@ class MainActivity : Activity() {
     private lateinit var expressionView: TextView
     private lateinit var resultView: TextView
 
-    private var expression = ""
     private var dark = true
+    private var expression = ""
     private var justCalculated = false
 
     private val history = mutableListOf<String>()
@@ -32,58 +34,74 @@ class MainActivity : Activity() {
         listOf("00", "0", ".", "=")
     )
 
-    private fun dp(v: Int) =
-        (v * resources.displayMetrics.density).toInt()
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
-    private fun color(hex: Long) = Color.rgb(
-        ((hex shr 16) and 255).toInt(),
-        ((hex shr 8) and 255).toInt(),
-        (hex and 255).toInt()
-    )
+    private fun color(hex: Long): Int =
+        Color.rgb(
+            ((hex shr 16) and 255).toInt(),
+            ((hex shr 8) and 255).toInt(),
+            (hex and 255).toInt()
+        )
 
-    private val bg: Int
-        get() = if (dark) Color.BLACK else color(0xEAF6FF)
+    // Theme colors
 
-    private val buttonBg: Int
-        get() = if (dark) color(0x101010) else color(0xD9EDF9)
+    private val backgroundColor: Int
+        get() = if (dark) Color.BLACK else color(0xF7F7F7)
 
-    private val functionBg: Int
-        get() = if (dark) color(0x080808) else color(0xF5FBFF)
+    private val panelColor: Int
+        get() = if (dark) color(0x101010) else Color.WHITE
 
-    private val primary: Int
-        get() = if (dark) Color.WHITE else color(0x253D50)
+    private val numberColor: Int
+        get() = if (dark) Color.BLACK else color(0xFFFFFF)
 
-    private val secondary: Int
-        get() = if (dark) color(0xB0B0B0) else color(0x52748A)
+    private val functionColor: Int
+        get() = if (dark) color(0x080808) else color(0xFFFFFF)
 
-    private val blue: Int
-        get() = color(0x168ACB)
+    private val textColor: Int
+        get() = if (dark) Color.WHITE else color(0x222222)
+
+    private val secondaryColor: Int
+        get() = if (dark) color(0xAAAAAA) else color(0x777777)
+
+    private val redColor: Int
+        get() = color(0xE52D36)
+
+    private val borderColor: Int
+        get() = if (dark) color(0x202020) else color(0xEEEEEE)
+
+    private val operatorTextColor: Int
+        get() = if (dark) color(0xFF5058) else color(0xD72D35)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        dark = getPreferences(MODE_PRIVATE)
+            .getBoolean("dark_theme", true)
 
         createUI()
     }
 
-    private fun rounded(color: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(5).toFloat()
-        }
-    }
-
     private fun createUI() {
+
+        window.statusBarColor = backgroundColor
+        window.navigationBarColor = backgroundColor
+
+        if (dark) {
+            window.decorView.systemUiVisibility = 0
+        } else {
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+                View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
 
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(15), dp(10), dp(15), dp(12))
-            setBackgroundColor(bg)
+            setBackgroundColor(backgroundColor)
+            setPadding(dp(15), dp(5), dp(15), dp(8))
         }
 
-        // Header
+        // HEADER
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -98,15 +116,15 @@ class MainActivity : Activity() {
             text = "Calculator"
             textSize = 21f
             gravity = Gravity.CENTER
-            setTextColor(primary)
-            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(textColor)
+            typeface = Typeface.create(
+                "sans-serif-medium",
+                Typeface.NORMAL
+            )
         }
 
-        val themeButton = headerIcon(
-            if (dark) "☼" else "☾"
-        ) {
-            dark = !dark
-            createUI()
+        val settingsButton = headerIcon("☷") {
+            showSettings()
         }
 
         header.addView(
@@ -120,7 +138,7 @@ class MainActivity : Activity() {
         )
 
         header.addView(
-            themeButton,
+            settingsButton,
             LinearLayout.LayoutParams(dp(48), dp(48))
         )
 
@@ -129,25 +147,26 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(-1, dp(52))
         )
 
-        // Display
+        // DISPLAY AREA
 
         val display = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM or Gravity.END
-            setPadding(dp(8), dp(20), dp(8), dp(25))
+            setPadding(dp(8), dp(10), dp(8), dp(28))
         }
 
         expressionView = TextView(this).apply {
             textSize = 23f
             gravity = Gravity.END
-            setTextColor(secondary)
+            setTextColor(secondaryColor)
             maxLines = 2
         }
 
         resultView = TextView(this).apply {
-            textSize = 48f
+            text = "0"
+            textSize = 53f
             gravity = Gravity.END
-            setTextColor(primary)
+            setTextColor(textColor)
             typeface = Typeface.create(
                 "sans-serif-light",
                 Typeface.NORMAL
@@ -167,52 +186,105 @@ class MainActivity : Activity() {
 
         root.addView(
             display,
-            LinearLayout.LayoutParams(-1, 0, 1.8f)
+            LinearLayout.LayoutParams(-1, 0, 1.7f)
         )
 
-        // Keypad
+        // CALCULATOR BOTTOM PANEL
 
-        val keypad = LinearLayout(this).apply {
+        val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+
+            background = topRoundedBackground(panelColor)
+
+            setPadding(
+                dp(10),
+                dp(12),
+                dp(10),
+                dp(8)
+            )
         }
+
+        // Small handle
+
+        val handle = View(this).apply {
+            background = GradientDrawable().apply {
+                setColor(
+                    if (dark) color(0x454545)
+                    else color(0xDADADA)
+                )
+                cornerRadius = dp(20).toFloat()
+            }
+        }
+
+        val handleContainer = FrameLayout(this)
+
+        handleContainer.addView(
+            handle,
+            FrameLayout.LayoutParams(
+                dp(76),
+                dp(5),
+                Gravity.CENTER
+            )
+        )
+
+        panel.addView(
+            handleContainer,
+            LinearLayout.LayoutParams(-1, dp(30))
+        )
+
+        // BUTTON ROWS
 
         keys.forEach { rowKeys ->
 
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
             }
 
             rowKeys.forEach { key ->
 
-                val button = makeButton(key)
+                val cell = FrameLayout(this)
+
+                val button = createButton(key)
+
+                cell.addView(
+                    button,
+                    FrameLayout.LayoutParams(
+                        -1,
+                        -1
+                    ).apply {
+                        setMargins(dp(4), dp(4), dp(4), dp(4))
+                    }
+                )
 
                 row.addView(
-                    button,
+                    cell,
                     LinearLayout.LayoutParams(
-                        0, -1, 1f
-                    ).apply {
-                        setMargins(
-                            dp(4), dp(5), dp(4), dp(5)
-                        )
-                    }
+                        0,
+                        -1,
+                        1f
+                    )
                 )
             }
 
-            keypad.addView(
+            panel.addView(
                 row,
                 LinearLayout.LayoutParams(-1, 0, 1f)
             )
         }
 
         root.addView(
-            keypad,
-            LinearLayout.LayoutParams(-1, 0, 2.7f)
+            panel,
+            LinearLayout.LayoutParams(-1, 0, 2.8f)
         )
 
         setContentView(root)
 
         updateDisplay()
     }
+
+    // HEADER ICONS
 
     private fun headerIcon(
         symbol: String,
@@ -223,30 +295,73 @@ class MainActivity : Activity() {
             text = symbol
             textSize = 27f
             gravity = Gravity.CENTER
-            setTextColor(secondary)
-            setOnClickListener { action() }
+            setTextColor(secondaryColor)
+            isClickable = true
+            isFocusable = true
+
+            setOnClickListener {
+                action()
+            }
         }
     }
 
-    private fun makeButton(key: String): TextView {
+    // ROUNDED TOP PANEL
+
+    private fun topRoundedBackground(
+        color: Int
+    ): GradientDrawable {
+
+        return GradientDrawable().apply {
+            setColor(color)
+
+            cornerRadii = floatArrayOf(
+                dp(38).toFloat(), dp(38).toFloat(),
+                dp(38).toFloat(), dp(38).toFloat(),
+                0f, 0f,
+                0f, 0f
+            )
+        }
+    }
+
+    // CIRCULAR BUTTON BACKGROUND
+
+    private fun buttonBackground(
+        key: String
+    ): GradientDrawable {
+
+        val fill = when (key) {
+            "AC", "=" -> redColor
+
+            "C", "%", "÷", "×", "−", "+" ->
+                functionColor
+
+            else -> numberColor
+        }
+
+        return GradientDrawable().apply {
+
+            shape = GradientDrawable.OVAL
+            setColor(fill)
+
+            setStroke(
+                dp(1),
+                when (key) {
+                    "AC", "=" -> color(0xF05A60)
+                    else -> borderColor
+                }
+            )
+        }
+    }
+
+    // CREATE BUTTON
+
+    private fun createButton(key: String): TextView {
+
+        val isRed = key == "AC" || key == "="
 
         val isOperator = key in listOf(
-            "÷", "×", "−", "+", "%"
+            "C", "%", "÷", "×", "−", "+"
         )
-
-        val isFunction = key in listOf("AC", "C")
-
-        val buttonColor = when {
-            isOperator -> functionBg
-            isFunction -> functionBg
-            else -> buttonBg
-        }
-
-        val textColor = when {
-            isOperator -> blue
-            isFunction -> blue
-            else -> primary
-        }
 
         return TextView(this).apply {
 
@@ -254,23 +369,46 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
 
             textSize = when (key) {
-                "AC", "C" -> 23f
+                "AC" -> 23f
+                "C" -> 24f
+                "00" -> 25f
                 else -> 29f
             }
 
-            setTextColor(textColor)
-            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(
+                when {
+                    isRed -> Color.WHITE
+                    isOperator -> operatorTextColor
+                    else -> textColor
+                }
+            )
 
-            background = rounded(buttonColor)
+            typeface = Typeface.create(
+                "sans-serif-medium",
+                Typeface.NORMAL
+            )
+
+            background = buttonBackground(key)
 
             isClickable = true
             isFocusable = true
+
+            contentDescription = when (key) {
+                "AC" -> "All Clear"
+                "C" -> "Clear Entry"
+                "=" -> "Calculate"
+                "÷" -> "Divide"
+                "×" -> "Multiply"
+                else -> key
+            }
 
             setOnClickListener {
                 handleKey(key)
             }
         }
     }
+
+    // BUTTON ACTIONS
 
     private fun handleKey(key: String) {
 
@@ -297,12 +435,13 @@ class MainActivity : Activity() {
                 ) {
                     expression += "%"
                 }
+
                 justCalculated = false
             }
 
             "÷", "×", "−", "+" -> {
 
-                val op = when (key) {
+                val operator = when (key) {
                     "÷" -> "÷"
                     "×" -> "×"
                     "−" -> "-"
@@ -310,12 +449,18 @@ class MainActivity : Activity() {
                 }
 
                 if (expression.isEmpty()) {
-                    if (op == "-") expression = "-"
+
+                    if (operator == "-") {
+                        expression = "-"
+                    }
+
                 } else {
+
                     if (expression.last() in "+-×÷") {
                         expression = expression.dropLast(1)
                     }
-                    expression += op
+
+                    expression += operator
                 }
 
                 justCalculated = false
@@ -335,10 +480,15 @@ class MainActivity : Activity() {
                     .substringAfterLast("÷")
 
                 if (!current.contains(".")) {
+
                     expression += if (
                         expression.isEmpty() ||
                         expression.last() in "+-×÷"
-                    ) "0." else "."
+                    ) {
+                        "0."
+                    } else {
+                        "."
+                    }
                 }
             }
 
@@ -356,29 +506,34 @@ class MainActivity : Activity() {
         updateDisplay()
     }
 
+    // CLEAR CURRENT NUMBER
+
     private fun clearEntry() {
 
         if (expression.isEmpty()) return
 
-        var i = expression.length - 1
+        var index = expression.length - 1
 
-        while (i >= 0 &&
-            (expression[i].isDigit() ||
-             expression[i] == '.')
+        while (index >= 0 &&
+            (expression[index].isDigit() ||
+             expression[index] == '.')
         ) {
-            i--
+            index--
         }
 
-        expression = expression.substring(0, i + 1)
+        expression = expression.substring(0, index + 1)
+
         justCalculated = false
     }
+
+    // UPDATE DISPLAY
 
     private fun updateDisplay() {
 
         expressionView.text = expression.replace("-", "−")
 
         if (expression.isEmpty()) {
-            resultView.text = ""
+            resultView.text = "0"
             return
         }
 
@@ -390,46 +545,73 @@ class MainActivity : Activity() {
         }
     }
 
+    // CALCULATE RESULT
+
     private fun calculate() {
 
         if (expression.isEmpty()) return
 
         try {
+
             val original = expression.replace("-", "−")
+
             val value = ExpressionParser(expression).parse()
+
             val answer = formatNumber(value)
 
             history.add("$original = $answer")
 
             expression = answer
+
             expressionView.text = ""
             resultView.text = answer
 
             justCalculated = true
 
         } catch (_: Exception) {
+
             resultView.text = "Error"
             justCalculated = true
         }
     }
 
+    // FORMAT NUMBER
+
+    private fun formatNumber(value: Double): String {
+
+        if (!value.isFinite()) return "Error"
+
+        return BigDecimal.valueOf(value)
+            .stripTrailingZeros()
+            .toPlainString()
+    }
+
+    // HISTORY
+
     private fun showHistory() {
 
         if (history.isEmpty()) {
+
             AlertDialog.Builder(this)
                 .setTitle("History")
                 .setMessage("No calculations yet.")
                 .setPositiveButton("OK", null)
                 .show()
+
             return
         }
 
         AlertDialog.Builder(this)
             .setTitle("Calculation History")
-            .setItems(history.reversed().toTypedArray()) { _, index ->
+            .setItems(
+                history.reversed().toTypedArray()
+            ) { _, index ->
+
                 expression = history.reversed()[index]
                     .substringAfter(" = ")
+
                 justCalculated = true
+
                 updateDisplay()
             }
             .setNeutralButton("Clear History") { _, _ ->
@@ -439,14 +621,43 @@ class MainActivity : Activity() {
             .show()
     }
 
-    private fun formatNumber(value: Double): String {
-        if (!value.isFinite()) return "Error"
+    // SETTINGS
 
-        return BigDecimal.valueOf(value)
-            .stripTrailingZeros()
-            .toPlainString()
+    private fun showSettings() {
+
+        val options = arrayOf(
+            if (dark) "Switch to Light Theme"
+            else "Switch to AMOLED Dark Theme",
+
+            "Calculation History"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Calculator Settings")
+            .setItems(options) { _, index ->
+
+                when (index) {
+
+                    0 -> {
+                        dark = !dark
+
+                        getPreferences(MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("dark_theme", dark)
+                            .apply()
+
+                        createUI()
+                    }
+
+                    1 -> showHistory()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 }
+
+// MATHEMATICAL EXPRESSION PARSER
 
 private class ExpressionParser(
     private val input: String
@@ -455,6 +666,7 @@ private class ExpressionParser(
     private var position = 0
 
     fun parse(): Double {
+
         val result = parseExpression()
 
         if (position != input.length || !result.isFinite()) {
@@ -465,18 +677,23 @@ private class ExpressionParser(
     }
 
     private fun parseExpression(): Double {
+
         var value = parseTerm()
 
         while (position < input.length) {
+
             when (input[position]) {
+
                 '+' -> {
                     position++
                     value += parseTerm()
                 }
+
                 '-' -> {
                     position++
                     value -= parseTerm()
                 }
+
                 else -> return value
             }
         }
@@ -485,22 +702,31 @@ private class ExpressionParser(
     }
 
     private fun parseTerm(): Double {
+
         var value = parseFactor()
 
         while (position < input.length) {
+
             when (input[position]) {
+
                 '×' -> {
                     position++
                     value *= parseFactor()
                 }
+
                 '÷' -> {
+
                     position++
+
                     val divisor = parseFactor()
+
                     if (divisor == 0.0) {
                         throw ArithmeticException("Division by zero")
                     }
+
                     value /= divisor
                 }
+
                 else -> return value
             }
         }
@@ -528,11 +754,12 @@ private class ExpressionParser(
         var decimal = false
 
         while (position < input.length) {
-            val c = input[position]
 
-            if (c.isDigit()) {
+            val character = input[position]
+
+            if (character.isDigit()) {
                 position++
-            } else if (c == '.' && !decimal) {
+            } else if (character == '.' && !decimal) {
                 decimal = true
                 position++
             } else {
